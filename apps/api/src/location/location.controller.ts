@@ -20,12 +20,15 @@ export class LocationController {
     @Query('lat') lat: string,
     @Query('lng') lng: string,
     @Query('radiusKm') radiusKm: string,
+    @Query('includeSelf') includeSelf?: string,
   ) {
+    const exclude = includeSelf === 'true' ? undefined : req.user.userId
+
     return this.location.nearby(
       Number(lat),
       Number(lng),
       radiusKm ? Number(radiusKm) : 5,
-      req.user.userId,
+      exclude,
     )
   }
 }
