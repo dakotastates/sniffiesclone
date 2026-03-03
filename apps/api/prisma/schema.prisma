@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider          = "postgresql"
+  url               = env("DATABASE_URL")
+  shadowDatabaseUrl = env("SHADOW_DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  displayName  String
+  bio          String?
+  avatarUrl    String?
+  createdAt    DateTime @default(now())
+
+  location     UserLocation?
+}
+
+model UserLocation {
+  userId    String @id
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  latApprox Float
+  lngApprox Float
+
+  point     Unsupported("geography(Point,4326)")
+
+  updatedAt DateTime @updatedAt
+
+  @@index([latApprox, lngApprox])
+}
