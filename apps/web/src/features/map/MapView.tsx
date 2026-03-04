@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
 import L from 'leaflet'
 
@@ -30,6 +30,14 @@ function jitterUsers(users: NearbyUser[]) {
   })
 }
 
+  function fingerprintUsers(users: NearbyUser[]) {
+    // include id + coords + avatarUrl so marker changes are detected
+    return users
+      .map((u) => `${u.id}:${u.latApprox.toFixed(5)},${u.lngApprox.toFixed(5)}:${u.avatarUrl ?? ''}`)
+      .sort()
+      .join('|')
+  }
+
 function avatarIcon(url: string | null) {
   const img = url
     ? `<img src="${url}" style="width:40px;height:40px;border-radius:999px;border:2px solid white;box-shadow:0 2px 10px rgba(0,0,0,.25);object-fit:cover;" />`
@@ -55,6 +63,27 @@ export default function MapView() {
 
   const center = useMemo(() => me ?? { lat: 37.7749, lng: -122.4194 }, [me])
 
+  const lastFingerprintRef = useRef<string>('')
+
+  // async function fetchNearby(lat: number, lng: number) {
+  //   try {
+  //     const qs = new URLSearchParams({
+  //       lat: String(lat),
+  //       lng: String(lng),
+  //       radiusKm: '10',
+  //       includeSelf: String(includeSelf),
+  //     })
+
+  //     // const nearby = await api<NearbyUser[]>(`/location/nearby?${qs.toString()}`)
+      
+  //     // setUsers(nearby)
+  //     const nearby = await api<NearbyUser[]>(`/location/nearby?${qs.toString()}`)
+  //     setUsers(jitterUsers(nearby))
+  //   } catch (e) {
+  //     console.error('fetchNearby failed', e)
+  //   }
+  // }
+
   async function fetchNearby(lat: number, lng: number) {
     try {
       const qs = new URLSearchParams({
@@ -64,11 +93,14 @@ export default function MapView() {
         includeSelf: String(includeSelf),
       })
 
-      // const nearby = await api<NearbyUser[]>(`/location/nearby?${qs.toString()}`)
-      
-      // setUsers(nearby)
       const nearby = await api<NearbyUser[]>(`/location/nearby?${qs.toString()}`)
-      setUsers(jitterUsers(nearby))
+      const jittered = jitterUsers(nearby)
+      const fp = fingerprintUsers(jittered)
+
+      if (fp !== lastFingerprintRef.current) {
+        lastFingerprintRef.current = fp
+        setUsers(jittered)
+      }
     } catch (e) {
       console.error('fetchNearby failed', e)
     }

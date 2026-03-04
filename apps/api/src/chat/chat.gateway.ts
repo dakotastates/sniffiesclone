@@ -66,16 +66,43 @@ export class ChatGateway implements OnGatewayConnection {
   @SubscribeMessage('message:send')
   async sendMessage(
     @ConnectedSocket() client: Socket,
-    @MessageBody() body: { conversationId: string; text: string },
+    @MessageBody() body: { conversationId: string; text: string; clientMessageId?: string },
   ) {
     const userId = client.data.userId as string | undefined
     if (!userId) return { ok: false }
 
     const msg = await this.chat.sendMessage(userId, body.conversationId, body.text)
 
-    // Broadcast to everyone in the conversation room
-    this.server.to(body.conversationId).emit('message:new', msg)
+    const payload = {
+      ...msg,
+      conversationId: body.conversationId,
+      clientMessageId: body.clientMessageId ?? null,
+    }
 
-    return { ok: true, message: msg }
+    this.server.to(body.conversationId).emit('message:new', payload)
+
+    return { ok: true, message: payload }
+  }
+
+  @SubscribeMessage('typing:start')
+  async typingStart(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId: string },
+  ) {
+    const userId = client.data.userId as string | undefined
+    if (!userId) return { ok: false }
+    client.to(body.conversationId).emit('typing', { conversationId: body.conversationId, userId, isTyping: true })
+    return { ok: true }
+  }
+
+  @SubscribeMessage('typing:stop')
+  async typingStop(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() body: { conversationId: string },
+  ) {
+    const userId = client.data.userId as string | undefined
+    if (!userId) return { ok: false }
+    client.to(body.conversationId).emit('typing', { conversationId: body.conversationId, userId, isTyping: false })
+    return { ok: true }
   }
 }
