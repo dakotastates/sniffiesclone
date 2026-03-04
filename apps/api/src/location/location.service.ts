@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common'
+import { Injectable, UnauthorizedException } from '@nestjs/common'
 import { PrismaService } from '../prisma/prisma.service'
 import { Prisma } from '@prisma/client'
 
@@ -11,27 +11,33 @@ function roundTo(num: number, decimals: number) {
 export class LocationService {
   constructor(private readonly prisma: PrismaService) {}
 
+  
+
   async upsertMyLocation(userId: string, lat: number, lng: number) {
     // Privacy: ~1km precision (2 decimals). You can tweak later.
     const latApprox = roundTo(lat, 2)
     const lngApprox = roundTo(lng, 2)
 
+    const exists = await this.prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
+    if (!exists) throw new UnauthorizedException('Stale token: user does not exist')
+
     // Use raw SQL because `point` is PostGIS geography (Unsupported in Prisma)
-    await this.prisma.$executeRaw`
-      INSERT INTO "UserLocation" ("userId", "latApprox", "lngApprox", "point")
-      VALUES (
-        ${userId},
-        ${latApprox},
-        ${lngApprox},
-        ST_SetSRID(ST_MakePoint(${lngApprox}, ${latApprox}), 4326)::geography
-      )
-      ON CONFLICT ("userId") DO UPDATE
-      SET
-        "latApprox" = EXCLUDED."latApprox",
-        "lngApprox" = EXCLUDED."lngApprox",
-        "point" = EXCLUDED."point",
-        "updatedAt" = NOW();
-    `
+  await this.prisma.$executeRaw`
+    INSERT INTO "UserLocation" ("userId", "latApprox", "lngApprox", "point", "updatedAt")
+    VALUES (
+      ${userId},
+      ${latApprox},
+      ${lngApprox},
+      ST_SetSRID(ST_MakePoint(${lngApprox}, ${latApprox}), 4326)::geography,
+      NOW()
+    )
+    ON CONFLICT ("userId") DO UPDATE
+    SET
+      "latApprox" = EXCLUDED."latApprox",
+      "lngApprox" = EXCLUDED."lngApprox",
+      "point" = EXCLUDED."point",
+      "updatedAt" = NOW();
+  `
 
     return { ok: true, latApprox, lngApprox }
   }
@@ -75,4 +81,8 @@ export class LocationService {
 
     return rows
   }
+
+  
+
+  
 }
