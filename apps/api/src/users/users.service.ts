@@ -12,7 +12,10 @@ export class UsersService {
     })
   }
 
-  async updateMe(userId: string, data: { displayName?: string; bio?: string }) {
+  async updateMe(
+    userId: string,
+    data: { displayName?: string; bio?: string; avatarUrl?: string },
+  ) {
     return this.prisma.user.update({
       where: { id: userId },
       data,
@@ -28,4 +31,6 @@ export class UsersService {
     if (!user) throw new NotFoundException('User not found')
     return user
   }
+
+  
 }
